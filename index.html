@@ -3,46 +3,38 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Thread3D Studio - Pro Geyim Dizayneri</title>
+    <title>Thread3D Studio - Fotorealistik Geyim</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Three.js və OrbitControls -->
+    <!-- Three.js və Əlavələri -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
     <!-- FontAwesome İkonları -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         body { font-family: 'Inter', sans-serif; background-color: #0b0f19; color: #fff; overflow-x: hidden; }
         canvas { display: block; outline: none; }
-        /* Scrollbar tənzimləmələri */
-        ::-webkit-scrollbar { width: 6px; height: 6px; }
-        ::-webkit-scrollbar-track { background: #111827; }
-        ::-webkit-scrollbar-thumb { background: #374151; border-radius: 3px; }
-        ::-webkit-scrollbar-thumb:hover { background: #4b5563; }
+        #loading-overlay { backdrop-filter: blur(5px); }
     </style>
 </head>
 <body class="flex flex-col h-screen select-none">
 
     <!-- Yuxarı Naviqasiya Paneli -->
-    <header class="flex items-center justify-between px-6 py-4 bg-gray-900/80 backdrop-blur-md border-b border-gray-800 z-20">
+    <header class="flex items-center justify-between px-6 py-4 bg-gray-900/90 backdrop-blur-md border-b border-gray-800 z-20">
         <div class="flex items-center space-x-3">
-            <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-purple-600 to-indigo-500 flex items-center justify-center shadow-lg shadow-purple-500/30">
+            <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 to-purple-500 flex items-center justify-center shadow-lg shadow-blue-500/30">
                 <i class="fa-solid fa-cube text-white text-lg"></i>
             </div>
             <div>
-                <h1 class="font-bold text-lg tracking-wide text-white">Thread3D Studio</h1>
-                <p class="text-xs text-purple-400">Fotorealistik 3D Geyim Simulyatoru</p>
+                <h1 class="font-bold text-lg tracking-wide text-white">Thread3D Realism</h1>
+                <p class="text-xs text-blue-400">Yüksək Qrafikalı 3D Mühərrik (GLTF/PBR)</p>
             </div>
         </div>
-
         <div class="flex items-center space-x-3">
-            <button onclick="resetCamera()" class="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 text-sm font-medium rounded-xl transition border border-gray-700 flex items-center space-x-2">
-                <i class="fa-solid fa-rotate-right"></i>
-                <span class="hidden sm:inline"> Kameranı Sıfırla</span>
-            </button>
-            <button onclick="exportImage()" class="px-5 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-sm font-semibold rounded-xl shadow-lg shadow-purple-600/30 transition flex items-center space-x-2">
-                <i class="fa-solid fa-download"></i>
-                <span>Görüntünü Saxla</span>
+            <button onclick="exportImage()" class="px-5 py-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white text-sm font-semibold rounded-xl shadow-lg transition flex items-center space-x-2">
+                <i class="fa-solid fa-camera"></i>
+                <span>Renderi Saxla</span>
             </button>
         </div>
     </header>
@@ -51,383 +43,225 @@
     <div class="flex-1 flex flex-col lg:flex-row relative overflow-hidden">
         
         <!-- 3D Render Ekranı -->
-        <div id="canvas-container" class="flex-1 relative bg-gradient-to-b from-gray-950 via-gray-900 to-gray-950 flex items-center justify-center">
+        <div id="canvas-container" class="flex-1 relative bg-[#0a0c10] flex items-center justify-center">
             
-            <!-- Aktiv Model İndikatoru -->
-            <div class="absolute top-4 left-4 z-10 bg-gray-900/70 backdrop-blur-md px-4 py-2 rounded-xl border border-gray-800 flex items-center space-x-2 shadow-lg">
-                <span class="w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse"></span>
-                <span id="active-model-name" class="text-sm font-medium text-gray-200">Klassik T-shirt (360° Fırla)</span>
+            <!-- Yüklənmə və Xəbərdarlıq Ekranı -->
+            <div id="status-message" class="absolute inset-0 flex flex-col items-center justify-center bg-black/60 z-10 pointer-events-none transition-opacity duration-300">
+                <div class="bg-gray-900 border border-gray-700 p-6 rounded-2xl max-w-md text-center shadow-2xl">
+                    <i class="fa-solid fa-circle-notch fa-spin text-4xl text-blue-500 mb-4" id="status-icon"></i>
+                    <h2 class="text-lg font-bold text-white mb-2" id="status-title">3D Model Yüklənir...</h2>
+                    <p class="text-sm text-gray-400" id="status-desc">Realistik detallar və işıqlandırma hesablanır.</p>
+                </div>
             </div>
 
             <!-- İdarəetmə İpuçları -->
             <div class="absolute bottom-4 left-1/2 transform -translate-x-1/2 z-10 bg-gray-900/60 backdrop-blur-md px-4 py-2 rounded-xl border border-gray-800/80 text-xs text-gray-400 flex items-center space-x-4 pointer-events-none">
-                <span><i class="fa-solid fa-hand text-purple-400 mr-1"></i> Fırlatmaq üçün çək</span>
-                <span><i class="fa-solid fa-magnifying-glass text-purple-400 mr-1"></i> Yaxınlaşdır / Uzaqlaşdır</span>
+                <span><i class="fa-solid fa-hand text-blue-400 mr-1"></i> Fırlat</span>
+                <span><i class="fa-solid fa-magnifying-glass text-blue-400 mr-1"></i> Yaxınlaşdır</span>
             </div>
         </div>
 
-        <!-- Sağ İdarəetmə Paneli (Tablar) -->
+        <!-- Sağ İdarəetmə Paneli -->
         <aside class="w-full lg:w-96 bg-gray-900 border-t lg:border-t-0 lg:border-l border-gray-800 flex flex-col z-20 shadow-2xl">
             
-            <!-- Tab Başlıqları -->
-            <div class="grid grid-cols-3 bg-gray-950/50 p-2 gap-1 border-b border-gray-800">
-                <button onclick="switchTab('models')" id="tab-btn-models" class="py-2.5 text-xs font-semibold rounded-lg transition flex flex-col items-center justify-center space-y-1 bg-purple-600 text-white shadow-md">
-                    <i class="fa-solid fa-shirt text-sm"></i>
-                    <span>Modellər</span>
-                </button>
-                <button onclick="switchTab('design')" id="tab-btn-design" class="py-2.5 text-xs font-semibold rounded-lg transition flex flex-col items-center justify-center space-y-1 text-gray-400 hover:text-white hover:bg-gray-800">
-                    <i class="fa-solid fa-image text-sm"></i>
-                    <span>Dizayn</span>
-                </button>
-                <button onclick="switchTab('colors')" id="tab-btn-colors" class="py-2.5 text-xs font-semibold rounded-lg transition flex flex-col items-center justify-center space-y-1 text-gray-400 hover:text-white hover:bg-gray-800">
-                    <i class="fa-solid fa-palette text-sm"></i>
-                    <span>Rənglər</span>
-                </button>
-            </div>
-
-            <!-- Tab Məzmunları -->
-            <div class="flex-1 overflow-y-auto p-5 space-y-6">
+            <div class="p-5 space-y-6 overflow-y-auto h-full">
                 
-                <!-- MODELLƏR TABI -->
-                <div id="tab-models" class="space-y-4">
-                    <h3 class="text-xs font-bold text-gray-400 uppercase tracking-wider">3D Geyim Kateqoriyaları</h3>
-                    <div class="grid grid-cols-2 gap-3">
-                        <button onclick="changeModel('tshirt')" class="model-card group p-4 rounded-2xl bg-gray-800/60 border-2 border-purple-600 hover:bg-gray-800 transition flex flex-col items-center text-center space-y-2">
-                            <div class="w-12 h-12 rounded-xl bg-purple-600/20 text-purple-400 flex items-center justify-center text-xl group-hover:scale-110 transition">
-                                <i class="fa-solid fa-shirt"></i>
-                            </div>
-                            <span class="text-xs font-semibold text-gray-200">Klassik T-shirt</span>
-                        </button>
-                        <button onclick="changeModel('polo')" class="model-card group p-4 rounded-2xl bg-gray-800/60 border-2 border-transparent hover:border-gray-700 hover:bg-gray-800 transition flex flex-col items-center text-center space-y-2">
-                            <div class="w-12 h-12 rounded-xl bg-gray-700/50 text-gray-300 flex items-center justify-center text-xl group-hover:scale-110 transition">
-                                <i class="fa-solid fa-user-tie"></i>
-                            </div>
-                            <span class="text-xs font-semibold text-gray-200">Polo Yaxa</span>
-                        </button>
-                        <button onclick="changeModel('longsleeve')" class="model-card group p-4 rounded-2xl bg-gray-800/60 border-2 border-transparent hover:border-gray-700 hover:bg-gray-800 transition flex flex-col items-center text-center space-y-2">
-                            <div class="w-12 h-12 rounded-xl bg-gray-700/50 text-gray-300 flex items-center justify-center text-xl group-hover:scale-110 transition">
-                                <i class="fa-solid fa-vest"></i>
-                            </div>
-                            <span class="text-xs font-semibold text-gray-200">Uzun Qol Svit</span>
-                        </button>
-                        <button onclick="changeModel('hoodie')" class="model-card group p-4 rounded-2xl bg-gray-800/60 border-2 border-transparent hover:border-gray-700 hover:bg-gray-800 transition flex flex-col items-center text-center space-y-2">
-                            <div class="w-12 h-12 rounded-xl bg-gray-700/50 text-gray-300 flex items-center justify-center text-xl group-hover:scale-110 transition">
-                                <i class="fa-solid fa-hat-cowboy"></i>
-                            </div>
-                            <span class="text-xs font-semibold text-gray-200">Kapüşonlu Hudi</span>
-                        </button>
-                        <button onclick="changeModel('ziphoodie')" class="model-card group p-4 rounded-2xl bg-gray-800/60 border-2 border-transparent hover:border-gray-700 hover:bg-gray-800 transition flex flex-col items-center text-center space-y-2 col-span-2">
-                            <div class="w-12 h-12 rounded-xl bg-gray-700/50 text-gray-300 flex items-center justify-center text-xl group-hover:scale-110 transition">
-                                <i class="fa-solid fa-layer-group"></i>
-                            </div>
-                            <span class="text-xs font-semibold text-gray-200">Zamoklu Hudi (Full Zip)</span>
-                        </button>
-                    </div>
+                <!-- Geyim Seçimi -->
+                <div class="space-y-3">
+                    <h3 class="text-xs font-bold text-gray-400 uppercase tracking-wider"><i class="fa-solid fa-shirt mr-1"></i> Realistik Modellər (GLB)</h3>
+                    <select id="modelSelect" onchange="loadRealModel(this.value)" class="w-full bg-gray-800 border border-gray-700 text-white text-sm rounded-xl focus:ring-blue-500 focus:border-blue-500 block p-3">
+                        <option value="tshirt">Kişi T-shirt (Realistik)</option>
+                        <option value="hoodie">Hoodie (Qırışlı Parça)</option>
+                        <option value="polo">Polo (Detallı Yaxa)</option>
+                    </select>
+                    <p class="text-[10px] text-gray-500 mt-1 leading-tight">
+                        *Diqqət: Bu modellərin işləməsi üçün GitHub-da <b>models</b> qovluğunda <b>tshirt.glb</b>, <b>hoodie.glb</b> kimi real 3D fayllarınız olmalıdır.
+                    </p>
                 </div>
 
-                <!-- DİZAYN TABI -->
-                <div id="tab-design" class="space-y-5 hidden">
-                    <h3 class="text-xs font-bold text-gray-400 uppercase tracking-wider">Şəkil / Loqo Yüklə</h3>
-                    
-                    <!-- Yükləmə düyməsi -->
-                    <label class="flex flex-col items-center justify-center p-6 border-2 border-dashed border-gray-700 hover:border-purple-500 rounded-2xl cursor-pointer bg-gray-800/40 hover:bg-gray-800/80 transition group">
-                        <div class="w-12 h-12 rounded-full bg-purple-600/20 text-purple-400 flex items-center justify-center mb-2 group-hover:scale-110 transition">
+                <hr class="border-gray-800">
+
+                <!-- Dizayn / Loqo Yükləmə -->
+                <div class="space-y-3">
+                    <h3 class="text-xs font-bold text-gray-400 uppercase tracking-wider"><i class="fa-solid fa-image mr-1"></i> Şəkil / Loqo Yüklə</h3>
+                    <label class="flex flex-col items-center justify-center p-6 border-2 border-dashed border-gray-700 hover:border-blue-500 rounded-2xl cursor-pointer bg-gray-800/40 hover:bg-gray-800/80 transition group">
+                        <div class="w-10 h-10 rounded-full bg-blue-600/20 text-blue-400 flex items-center justify-center mb-2 group-hover:scale-110 transition">
                             <i class="fa-solid fa-cloud-arrow-up text-lg"></i>
                         </div>
-                        <span class="text-sm font-semibold text-gray-200">Şəkil Seç və ya Buraya At</span>
-                        <span class="text-xs text-gray-500 mt-1">PNG, JPG (Şəffaf fon məsləhətdir)</span>
+                        <span class="text-sm font-semibold text-gray-200">Kompüterdən Şəkil Seç</span>
                         <input type="file" id="imageUpload" accept="image/*" class="hidden" onchange="loadCustomImage(event)">
                     </label>
 
-                    <!-- Şəkil Parametrləri -->
-                    <div id="image-controls" class="space-y-4 hidden bg-gray-800/40 p-4 rounded-2xl border border-gray-800">
-                        <div class="flex items-center justify-between">
-                            <span class="text-xs font-semibold text-gray-300">Şəkil Ölçüsü (Scale)</span>
-                            <span id="scale-value" class="text-xs text-purple-400 font-mono">1.0x</span>
+                    <div id="image-controls" class="space-y-4 hidden bg-gray-800/40 p-4 rounded-xl border border-gray-800">
+                        <div>
+                            <div class="flex justify-between mb-1">
+                                <span class="text-xs text-gray-400">Şəklin Ölçüsü</span>
+                                <span id="scale-value" class="text-xs text-blue-400">1.0x</span>
+                            </div>
+                            <input type="range" min="0.2" max="3.0" step="0.1" value="1.0" oninput="updateTexture()" id="imageScale" class="w-full accent-blue-500 h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer">
                         </div>
-                        <input type="range" id="imageScale" min="0.2" max="3.0" step="0.1" value="1.0" oninput="updateImageScale(this.value)" class="w-full accent-purple-600 bg-gray-700 rounded-lg h-2 cursor-pointer">
-
-                        <div class="pt-2 flex space-x-3">
-                            <button onclick="removeImage()" class="flex-1 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 text-xs font-semibold rounded-xl border border-red-500/30 transition">
-                                <i class="fa-solid fa-trash mr-1"></i> Şəkli Sil
-                            </button>
-                        </div>
+                        <button onclick="removeImage()" class="w-full py-2 bg-red-500/10 text-red-400 text-xs font-semibold rounded-lg border border-red-500/20 hover:bg-red-500/20 transition">
+                            Şəkli Sil
+                        </button>
                     </div>
                 </div>
 
-                <!-- RƏNGLƏR TABI -->
-                <div id="tab-colors" class="space-y-5 hidden">
-                    <h3 class="text-xs font-bold text-gray-400 uppercase tracking-wider">Geyim Rəngi</h3>
-                    <div class="grid grid-cols-5 gap-3">
-                        <button onclick="changeColor('#ef4444')" class="w-12 h-12 rounded-xl bg-red-500 hover:scale-105 transition shadow-md border-2 border-white/20"></button>
-                        <button onclick="changeColor('#3b82f6')" class="w-12 h-12 rounded-xl bg-blue-500 hover:scale-105 transition shadow-md border-2 border-white/20"></button>
-                        <button onclick="changeColor('#10b981')" class="w-12 h-12 rounded-xl bg-emerald-500 hover:scale-105 transition shadow-md border-2 border-white/20"></button>
-                        <button onclick="changeColor('#111827')" class="w-12 h-12 rounded-xl bg-gray-900 hover:scale-105 transition shadow-md border-2 border-white/20"></button>
-                        <button onclick="changeColor('#f9fafb')" class="w-12 h-12 rounded-xl bg-gray-100 hover:scale-105 transition shadow-md border-2 border-white/20"></button>
-                        <button onclick="changeColor('#8b5cf6')" class="w-12 h-12 rounded-xl bg-purple-500 hover:scale-105 transition shadow-md border-2 border-white/20"></button>
-                        <button onclick="changeColor('#f59e0b')" class="w-12 h-12 rounded-xl bg-amber-500 hover:scale-105 transition shadow-md border-2 border-white/20"></button>
-                        <button onclick="changeColor('#ec4899')" class="w-12 h-12 rounded-xl bg-pink-500 hover:scale-105 transition shadow-md border-2 border-white/20"></button>
-                        <button onclick="changeColor('#06b6d4')" class="w-12 h-12 rounded-xl bg-cyan-500 hover:scale-105 transition shadow-md border-2 border-white/20"></button>
-                        <button onclick="changeColor('#374151')" class="w-12 h-12 rounded-xl bg-gray-700 hover:scale-105 transition shadow-md border-2 border-white/20"></button>
-                    </div>
+                <hr class="border-gray-800">
 
-                    <div class="pt-4 border-t border-gray-800">
-                        <label class="text-xs font-semibold text-gray-300 block mb-2">Xüsusi Rəng Seç</label>
-                        <div class="flex items-center space-x-3">
-                            <input type="color" id="customColorPicker" value="#3b82f6" onchange="changeColor(this.value)" class="w-12 h-10 bg-transparent rounded-lg cursor-pointer">
-                            <span class="text-xs text-gray-400">İstənilən rəng kodu tətbiq edin</span>
-                        </div>
+                <!-- Rəng Seçimi -->
+                <div class="space-y-3">
+                    <h3 class="text-xs font-bold text-gray-400 uppercase tracking-wider"><i class="fa-solid fa-palette mr-1"></i> Parça Rəngi</h3>
+                    <div class="flex items-center space-x-3">
+                        <input type="color" id="colorPicker" value="#ffffff" onchange="updateTexture()" class="w-12 h-12 bg-transparent rounded-lg cursor-pointer border-0 p-0">
+                        <span class="text-xs text-gray-400">Rəngi dəyişmək üçün kvadrata toxunun.</span>
                     </div>
                 </div>
 
             </div>
         </aside>
-
     </div>
 
-    <!-- JavaScript - Three.js 3D Rendering & Mantıq -->
     <script>
         let scene, camera, renderer, controls;
-        let clothingMesh, clothingMaterial;
-        let currentModelType = 'tshirt';
-        let customTexture = null;
-        let decalMesh = null;
-        let canvasTexture = null;
-        let ctx2D, canvas2D;
-
-        // 2D Offscreen Canvas for Dynamic Texture Mixing (Model color + User image)
-        const textureCanvasSize = 1024;
-        canvas2D = document.createElement('canvas');
-        canvas2D.width = textureCanvasSize;
-        canvas2D.height = textureCanvasSize;
-        ctx2D = canvas2D.getContext('2d');
-
-        let baseColorHex = '#3b82f6';
-        let userImageObj = null;
-        let imageScaleVal = 1.0;
-        let imagePosX = textureCanvasSize / 2;
-        let imagePosY = textureCanvasSize / 2;
+        let loadedModel = null;
+        let mainMesh = null; // Paltarın əsas hissəsi
+        
+        // Dinamik tekstura (Rəng və Loqonu birləşdirmək üçün)
+        let canvas2D, ctx2D, canvasTexture;
+        const textureSize = 2048; // Yüksək qətnamə (GTA 6 keyfiyyəti üçün)
+        
+        let userImage = null;
 
         init3D();
 
         function init3D() {
             const container = document.getElementById('canvas-container');
 
-            // Scene
+            // 1. Səhnə (Scene) - Qaranlıq premium fon
             scene = new THREE.Scene();
-            scene.background = new THREE.Color(0x07090e);
-            scene.fog = new THREE.FogExp2(0x07090e, 0.015);
+            scene.background = new THREE.Color(0x0a0c10);
 
-            // Camera
-            camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 1000);
-            camera.position.set(0, 1.5, 5);
+            // 2. Kamera
+            camera = new THREE.PerspectiveCamera(35, container.clientWidth / container.clientHeight, 0.1, 100);
+            camera.position.set(0, 0.5, 4);
 
-            // Renderer
+            // 3. Renderer - Yüksək qrafika tənzimləmələri
             renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
             renderer.setSize(container.clientWidth, container.clientHeight);
-            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.setPixelRatio(window.devicePixelRatio);
+            // Fotorealistik işıqlandırma üçün ton mapping
+            renderer.toneMapping = THREE.ACESFilmicToneMapping;
+            renderer.toneMappingExposure = 1.2;
+            renderer.outputEncoding = THREE.sRGBEncoding;
             renderer.shadowMap.enabled = true;
             renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-            renderer.outputEncoding = THREE.sRGBEncoding;
             container.appendChild(renderer.domElement);
 
-            // Controls
+            // 4. Orbit Controls
             controls = new THREE.OrbitControls(camera, renderer.domElement);
             controls.enableDamping = true;
             controls.dampingFactor = 0.05;
-            controls.minDistance = 2;
-            controls.maxDistance = 8;
-            controls.maxPolarAngle = Math.PI / 2 + 0.1; // Aşağı düşməni məhdudlaşdır
+            controls.minDistance = 1.5;
+            controls.maxDistance = 6;
+            controls.target.set(0, 0, 0);
 
-            // İşıqlandırma (GTA səviyyəsində yüksək qrafika və kölgələr)
-            const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+            // 5. İşıqlandırma (Studio Lighting)
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
             scene.add(ambientLight);
 
-            const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
-            dirLight.position.set(5, 10, 7);
+            const dirLight = new THREE.DirectionalLight(0xffffff, 1.5);
+            dirLight.position.set(2, 5, 3);
             dirLight.castShadow = true;
             dirLight.shadow.mapSize.width = 2048;
             dirLight.shadow.mapSize.height = 2048;
             scene.add(dirLight);
 
-            const backLight = new THREE.DirectionalLight(0x9061f9, 0.5);
-            backLight.position.set(-5, 5, -5);
+            const fillLight = new THREE.DirectionalLight(0xaaccff, 0.8);
+            fillLight.position.set(-3, 3, -2);
+            scene.add(fillLight);
+
+            const backLight = new THREE.DirectionalLight(0xffccaa, 0.6);
+            backLight.position.set(0, 3, -4);
             scene.add(backLight);
 
-            // Zəmin (Podium)
-            const floorGeo = new THREE.CylinderGeometry(3, 3, 0.2, 64);
-            const floorMat = new THREE.MeshStandardMaterial({ color: 0x111827, roughness: 0.8, metalness: 0.2 });
-            const floor = new THREE.Mesh(floorGeo, floorMat);
-            floor.position.y = -1.8;
-            floor.receiveShadow = true;
-            scene.add(floor);
-
-            // İlkin Geyim Modelini yarat
-            updateTextureCanvas();
-            createClothingModel('tshirt');
-
-            // Resize listener
-            window.addEventListener('resize', onWindowResize);
-        }
-
-        // Tabların idarə edilməsi
-        function switchTab(tabName) {
-            ['models', 'design', 'colors'].forEach(t => {
-                document.getElementById(`tab-${t}`).classList.add('hidden');
-                document.getElementById(`tab-btn-${t}`).className = "py-2.5 text-xs font-semibold rounded-lg transition flex flex-col items-center justify-center space-y-1 text-gray-400 hover:text-white hover:bg-gray-800";
-            });
-            document.getElementById(`tab-${tabName}`).classList.remove('hidden');
-            document.getElementById(`tab-btn-${tabName}`).className = "py-2.5 text-xs font-semibold rounded-lg transition flex flex-col items-center justify-center space-y-1 bg-purple-600 text-white shadow-md";
-        }
-
-        // Model dəyişdirici
-        function changeModel(type) {
-            currentModelType = type;
-            
-            const names = {
-                'tshirt': 'Klassik T-shirt (360° Fırla)',
-                'polo': 'Polo Yaxa Köynək',
-                'longsleeve': 'Uzun Qol Svit',
-                'hoodie': 'Kapüşonlu Hudi',
-                'ziphoodie': 'Zamoklu Hudi (Full Zip)'
-            };
-            document.getElementById('active-model-name').innerText = names[type];
-
-            if (clothingMesh) scene.remove(clothingMesh);
-            createClothingModel(type);
-        }
-
-        // Realistik Anatomik Geyim Həndəsəsi və Materialı
-        function createClothingModel(type) {
-            let geometry;
-
+            // 6. Dinamik Tekstura Canvas-ı Yaradılması
+            canvas2D = document.createElement('canvas');
+            canvas2D.width = textureSize;
+            canvas2D.height = textureSize;
+            ctx2D = canvas2D.getContext('2d');
             canvasTexture = new THREE.CanvasTexture(canvas2D);
             canvasTexture.encoding = THREE.sRGBEncoding;
+            canvasTexture.anisotropy = renderer.capabilities.getMaxAnisotropy();
 
-            clothingMaterial = new THREE.MeshStandardMaterial({
-                map: canvasTexture,
-                roughness: 0.75,
-                metalness: 0.05,
-                bumpScale: 0.02
-            });
+            updateTextureCanvas();
 
-            const group = new THREE.Group();
+            // İlk modeli yükləməyə cəhd et
+            loadRealModel('tshirt');
 
-            if (type === 'tshirt') {
-                // T-shirt Torso
-                const torsoGeo = new THREE.CylinderGeometry(0.75, 0.65, 1.8, 32);
-                const torso = new THREE.Mesh(torsoGeo, clothingMaterial);
-                torso.castShadow = true;
-                torso.receiveShadow = true;
-                group.add(torso);
+            window.addEventListener('resize', onWindowResize);
+            animate();
+        }
 
-                // Qollar
-                const sleeveGeo = new THREE.CylinderGeometry(0.3, 0.25, 0.9, 16);
-                
-                const leftSleeve = new THREE.Mesh(sleeveGeo, clothingMaterial);
-                leftSleeve.rotation.z = Math.PI / 3;
-                leftSleeve.position.set(-0.85, 0.5, 0);
-                leftSleeve.castShadow = true;
-                group.add(leftSleeve);
+        // Real .glb faylını yükləyən funksiya
+        function loadRealModel(modelName) {
+            showStatus(true, "3D Model Yüklənir...", "fa-circle-notch fa-spin text-blue-500");
 
-                const rightSleeve = new THREE.Mesh(sleeveGeo, clothingMaterial);
-                rightSleeve.rotation.z = -Math.PI / 3;
-                rightSleeve.position.set(0.85, 0.5, 0);
-                rightSleeve.castShadow = true;
-                group.add(rightSleeve);
-
-            } else if (type === 'polo') {
-                // Polo Yaxa
-                const torsoGeo = new THREE.CylinderGeometry(0.76, 0.66, 1.8, 32);
-                const torso = new THREE.Mesh(torsoGeo, clothingMaterial);
-                torso.castShadow = true;
-                group.add(torso);
-
-                const sleeveGeo = new THREE.CylinderGeometry(0.32, 0.26, 1.0, 16);
-                const leftSleeve = new THREE.Mesh(sleeveGeo, clothingMaterial);
-                leftSleeve.rotation.z = Math.PI / 3;
-                leftSleeve.position.set(-0.88, 0.5, 0);
-                group.add(leftSleeve);
-
-                const rightSleeve = new THREE.Mesh(sleeveGeo, clothingMaterial);
-                rightSleeve.rotation.z = -Math.PI / 3;
-                rightSleeve.position.set(0.88, 0.5, 0);
-                group.add(rightSleeve);
-
-                // Yaxa detalı
-                const collarGeo = new THREE.TorusGeometry(0.35, 0.08, 16, 32, Math.PI);
-                const collarMat = new THREE.MeshStandardMaterial({ color: 0x111827, roughness: 0.5 });
-                const collar = new THREE.Mesh(collarGeo, collarMat);
-                collar.rotation.x = Math.PI / 2;
-                collar.position.set(0, 0.92, 0);
-                group.add(collar);
-
-            } else if (type === 'longsleeve') {
-                // Uzun Qol Svit
-                const torsoGeo = new THREE.CylinderGeometry(0.78, 0.68, 1.8, 32);
-                const torso = new THREE.Mesh(torsoGeo, clothingMaterial);
-                torso.castShadow = true;
-                group.add(torso);
-
-                const sleeveGeo = new THREE.CylinderGeometry(0.28, 0.2, 1.8, 16);
-                const leftSleeve = new THREE.Mesh(sleeveGeo, clothingMaterial);
-                leftSleeve.rotation.z = Math.PI / 4;
-                leftSleeve.position.set(-1.1, 0.1, 0);
-                group.add(leftSleeve);
-
-                const rightSleeve = new THREE.Mesh(sleeveGeo, clothingMaterial);
-                rightSleeve.rotation.z = -Math.PI / 4;
-                rightSleeve.position.set(1.1, 0.1, 0);
-                group.add(rightSleeve);
-
-            } else if (type === 'hoodie' || type === 'ziphoodie') {
-                // Hudi
-                const torsoGeo = new THREE.CylinderGeometry(0.82, 0.72, 1.8, 32);
-                const torso = new THREE.Mesh(torsoGeo, clothingMaterial);
-                torso.castShadow = true;
-                group.add(torso);
-
-                const sleeveGeo = new THREE.CylinderGeometry(0.32, 0.22, 1.8, 16);
-                const leftSleeve = new THREE.Mesh(sleeveGeo, clothingMaterial);
-                leftSleeve.rotation.z = Math.PI / 4;
-                leftSleeve.position.set(-1.15, 0.1, 0);
-                group.add(leftSleeve);
-
-                const rightSleeve = new THREE.Mesh(sleeveGeo, clothingMaterial);
-                rightSleeve.rotation.z = -Math.PI / 4;
-                rightSleeve.position.set(1.15, 0.1, 0);
-                group.add(rightSleeve);
-
-                // Kapüşon
-                const hoodGeo = new THREE.SphereGeometry(0.45, 32, 16, 0, Math.PI * 2, 0, Math.PI / 1.5);
-                const hood = new THREE.Mesh(hoodGeo, clothingMaterial);
-                hood.position.set(0, 1.05, -0.15);
-                hood.rotation.x = -Math.PI / 6;
-                group.add(hood);
-
-                // Əgər Zamokludursa xətt əlavə et
-                if(type === 'ziphoodie') {
-                    const zipGeo = new THREE.BoxGeometry(0.04, 1.82, 0.05);
-                    const zipMat = new THREE.MeshStandardMaterial({ color: 0xd1d5db, metalness: 0.9, roughness: 0.2 });
-                    const zip = new THREE.Mesh(zipGeo, zipMat);
-                    zip.position.set(0, 0, 0.81);
-                    group.add(zip);
-                }
+            if (loadedModel) {
+                scene.remove(loadedModel);
+                loadedModel = null;
+                mainMesh = null;
             }
 
-            clothingMesh = group;
-            clothingMesh.position.y = 0.2;
-            scene.add(clothingMesh);
+            const loader = new THREE.GLTFLoader();
+            
+            // DİQQƏT: Bura sizin GitHub-a yükləyəcəyiniz modelin yoludur.
+            // Hazırda nümunə olaraq 'models/tshirt.glb' axtarır.
+            const modelPath = `models/${modelName}.glb`;
+
+            loader.load(
+                modelPath, 
+                function (gltf) {
+                    loadedModel = gltf.scene;
+                    
+                    // Modeli mərkəzə gətir və ölçüsünü tənzimlə
+                    const box = new THREE.Box3().setFromObject(loadedModel);
+                    const center = box.getCenter(new THREE.Vector3());
+                    loadedModel.position.sub(center); // mərkəzə çək
+                    loadedModel.position.y -= 0.2;
+
+                    // Bütün materialları bizim dinamik tekstura ilə əvəz et (PBR material)
+                    loadedModel.traverse((child) => {
+                        if (child.isMesh) {
+                            child.castShadow = true;
+                            child.receiveShadow = true;
+                            
+                            // Əgər geyimin əsas gövdəsidirsə
+                            mainMesh = child;
+                            
+                            // Yeni Realistik PBR Material tətbiq et
+                            child.material = new THREE.MeshStandardMaterial({
+                                map: canvasTexture, // Bizim rəng və loqo canvasımız
+                                roughness: 0.85,    // Parça kimi mat olması üçün
+                                metalness: 0.05,
+                                side: THREE.DoubleSide
+                            });
+                        }
+                    });
+
+                    scene.add(loadedModel);
+                    showStatus(false);
+                }, 
+                undefined, 
+                function (error) {
+                    console.warn("Model tapılmadı: ", error);
+                    // Əgər fayl tapılmazsa istifadəçiyə xəbərdarlıq göstər:
+                    showStatus(true, "Fayl Tapılmadı", "fa-triangle-exclamation text-red-500", 
+                    `Sistem <b>${modelPath}</b> faylını tapa bilmədi. Realistic qrafika əldə etmək üçün bu .glb faylını yaratdığınız 'models' qovluğuna yükləməlisiniz.`);
+                }
+            );
         }
 
-        // Rəng Dəyişdirici
-        function changeColor(colorHex) {
-            baseColorHex = colorHex;
-            document.getElementById('customColorPicker').value = colorHex;
-            updateTextureCanvas();
-        }
-
-        // Şəkil Yükləmə Funksiyası
+        // Şəkil yükləndikdə
         function loadCustomImage(event) {
             const file = event.target.files[0];
             if (!file) return;
@@ -436,77 +270,83 @@
             reader.onload = function(e) {
                 const img = new Image();
                 img.onload = function() {
-                    userImageObj = img;
+                    userImage = img;
                     document.getElementById('image-controls').classList.remove('hidden');
-                    updateTextureCanvas();
+                    updateTexture();
                 }
                 img.src = e.target.result;
             }
             reader.readAsDataURL(file);
         }
 
-        // Şəkil Ölçüsünü Tənzimləmək
-        function updateImageScale(val) {
-            imageScaleVal = parseFloat(val);
-            document.getElementById('scale-value').innerText = val + 'x';
-            updateTextureCanvas();
-        }
-
-        // Şəkli Silmək
         function removeImage() {
-            userImageObj = null;
+            userImage = null;
             document.getElementById('imageUpload').value = '';
             document.getElementById('image-controls').classList.add('hidden');
+            updateTexture();
+        }
+
+        // Rəng və ya Şəkil dəyişdikdə Canvas-ı yenilə
+        function updateTexture() {
             updateTextureCanvas();
         }
 
-        // 2D Tekstura Üzərində Rəng və Şəklin Birləşdirilməsi
+        // 2D Canvas-da arxa fon rəngi və istifadəçinin şəklini çəkirik
         function updateTextureCanvas() {
-            // Arxa fon rəngi (Geyim rəngi)
-            ctx2D.fillStyle = baseColorHex;
-            ctx2D.fillRect(0, 0, textureCanvasSize, textureCanvasSize);
-
-            // Realistik parça qırışları və kölgə effekti (Procedural Fabric Texture)
-            ctx2D.fillStyle = 'rgba(0, 0, 0, 0.04)';
-            for (let i = 0; i < textureCanvasSize; i += 4) {
-                ctx2D.fillRect(i, 0, 2, textureCanvasSize);
+            const color = document.getElementById('colorPicker').value;
+            let scaleVal = 1.0;
+            if(document.getElementById('imageScale')) {
+                scaleVal = parseFloat(document.getElementById('imageScale').value);
+                document.getElementById('scale-value').innerText = scaleVal.toFixed(1) + 'x';
             }
 
-            // Əgər istifadəçi şəkil yükləyibsə onu mərkəzə çək
-            if (userImageObj) {
+            // Zəmin rəngi
+            ctx2D.fillStyle = color;
+            ctx2D.fillRect(0, 0, textureSize, textureSize);
+
+            // Əgər loqo/şəkil varsa, mərkəzə əlavə et
+            if (userImage) {
                 ctx2D.save();
-                ctx2D.translate(imagePosX, imagePosY);
+                // Şəkli texture-un mərkəzinə yerləşdiririk (UV xəritəyə görə tənzimləmək olar)
+                ctx2D.translate(textureSize / 2, textureSize / 2);
                 
-                const baseW = 350 * imageScaleVal;
-                const baseH = (userImageObj.height / userImageObj.width) * baseW;
+                // Şəklin ölçüsünü hesabla
+                const baseW = 600 * scaleVal;
+                const baseH = (userImage.height / userImage.width) * baseW;
                 
-                ctx2D.drawImage(userImageObj, -baseW / 2, -baseH / 2, baseW, baseH);
+                ctx2D.drawImage(userImage, -baseW / 2, -baseH / 2, baseW, baseH);
                 ctx2D.restore();
             }
 
+            // Three.js-ə teksturanın yeniləndiyini bildir
             if (canvasTexture) {
                 canvasTexture.needsUpdate = true;
             }
         }
 
-        // Kameranı Sıfırla
-        function resetCamera() {
-            camera.position.set(0, 1.5, 5);
-            controls.target.set(0, 0, 0);
-            controls.reset();
+        function showStatus(show, title="", iconClass="", desc="") {
+            const el = document.getElementById('status-message');
+            if (show) {
+                el.classList.remove('opacity-0');
+                el.classList.add('opacity-100');
+                document.getElementById('status-title').innerHTML = title;
+                document.getElementById('status-icon').className = `fa-solid ${iconClass} text-4xl mb-4`;
+                if(desc) document.getElementById('status-desc').innerHTML = desc;
+            } else {
+                el.classList.remove('opacity-100');
+                el.classList.add('opacity-0');
+            }
         }
 
-        // Görüntünü Saxla (Export PNG)
         function exportImage() {
             renderer.render(scene, camera);
             const dataURL = renderer.domElement.toDataURL('image/png');
             const link = document.createElement('a');
-            link.download = 'thread3d-design.png';
+            link.download = 'thread3d-realistic-render.png';
             link.href = dataURL;
             link.click();
         }
 
-        // Ekran Ölçüsü Dəyişdikdə
         function onWindowResize() {
             const container = document.getElementById('canvas-container');
             camera.aspect = container.clientWidth / container.clientHeight;
@@ -514,13 +354,11 @@
             renderer.setSize(container.clientWidth, container.clientHeight);
         }
 
-        // Animasiya Dövrü (Render Loop)
         function animate() {
             requestAnimationFrame(animate);
             controls.update();
             renderer.render(scene, camera);
         }
-        animate();
     </script>
 </body>
 </html>
